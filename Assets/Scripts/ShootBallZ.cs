@@ -1,23 +1,44 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using TMPro;
 
 public class ShootBallZ : MonoBehaviour
 {
     #region Fields
 
+    private MainCamera mainCamera;
     [SerializeField]
-    GameObject ballPrediction;
+    private GameObject gameOverScreen;
     [SerializeField]
-    GameObject prefabsGoalFX;
-    Rigidbody2D rb2d;
-    LineRenderer lr;
+    private GameObject ballPrediction;
+    [SerializeField]
+    private GameObject prefabsGoalFX;
+    private GameObject start;
+    private Rigidbody2D rb2d;
+    private LineRenderer lr;
     private Vector2 startPosition;
     private Vector2 endPosition;
-    private float force = 50F;
+    private float minPower = 50F;
+    private float maxPower = 500F;
     private Scene mainScene;
     private PhysicsScene2D mainPhysicsScene;
     private Scene predictionScene;
     private PhysicsScene2D predictionPhysicsScene;
+    private AudioSource[] audioSources;
+    private AudioSource goalSource;
+    private AudioSource shootSource;
+    [SerializeField]
+    private TextMeshProUGUI textScore;
+    private int score = 0;
+    [SerializeField]
+    private TextMeshProUGUI textGameOver;
+    [SerializeField]
+    private TextMeshProUGUI textTurn;
+    private int maxTurn = 5;
+    private int turn;
+    private bool isWaiting = false;
+    private float time = 0F;
 
     #endregion
 
@@ -26,24 +47,55 @@ public class ShootBallZ : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        mainCamera = GameObject.FindWithTag("MainCamera").GetComponent<MainCamera>();
         rb2d = gameObject.GetComponent<Rigidbody2D>();
         lr = gameObject.GetComponent<LineRenderer>();
+        start = GameObject.Find("Start");
         Physics2D.simulationMode = SimulationMode2D.Script;
         mainScene = SceneManager.CreateScene("MainScene");
         mainPhysicsScene = mainScene.GetPhysicsScene2D();
         CreateSceneParameters sceneParameters = new CreateSceneParameters(LocalPhysicsMode.Physics2D);
         predictionScene = SceneManager.CreateScene("PredictionScene", sceneParameters);
         predictionPhysicsScene = predictionScene.GetPhysicsScene2D();
+        audioSources = GameObject.FindWithTag("MainCamera").GetComponents<AudioSource>();
+        foreach (AudioSource audioSource in audioSources)
+        {
+            if (audioSource.clip.name == "Goal")
+            {
+                goalSource = audioSource;
+            }
+            else if (audioSource.clip.name == "Shoot")
+            {
+                shootSource = audioSource;
+            }
+        }
+        textScore.text = "Score: " + score;
+        turn = maxTurn;
+        textTurn.text = "Turn: " + turn;
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (Input.GetMouseButtonDown(0)) DragStart();
+        if (!isWaiting)
+        {
+            if (!ReadyShoot()) { return; }
 
-        if (Input.GetMouseButton(0)) DragChange();
+            if (ReadyShoot() && turn == 0) GameOver();
 
-        if (Input.GetMouseButtonUp(0)) DragRelease();
+            if (Input.GetMouseButtonDown(0)) DragStart();
+
+            if (Input.GetMouseButton(0)) DragChange();
+
+            if (Input.GetMouseButtonUp(0)) DragRelease();
+
+        }
+        else Waiting();
+    }
+
+    private bool ReadyShoot()
+    {
+        return rb2d.velocity.magnitude <= 0F;
     }
 
     private Vector2 GetMousePosition() => Camera.main.ScreenToWorldPoint(Input.mousePosition);
@@ -69,7 +121,7 @@ public class ShootBallZ : MonoBehaviour
         GameObject prediction = GameObject.Instantiate(ballPrediction);
         SceneManager.MoveGameObjectToScene(prediction, predictionScene);
         prediction.transform.position = gameObject.transform.position;
-        prediction.GetComponent<Rigidbody2D>().AddForce(direction * force, ForceMode2D.Force);
+        prediction.GetComponent<Rigidbody2D>().AddForce(Vector2.ClampMagnitude(direction * minPower, maxPower), ForceMode2D.Force);
         lr.positionCount = 50;
         for (int i = 0; i < 50; i++)
         {
@@ -81,10 +133,44 @@ public class ShootBallZ : MonoBehaviour
 
     private void DragRelease()
     {
+        rb2d.velocity = new Vector2(0.01F, 0.01F);
         lr.positionCount = 0;
         endPosition = GetMousePosition();
         Vector2 direction = startPosition - endPosition;
-        rb2d.AddForce(direction * force, ForceMode2D.Force);
+        rb2d.AddForce(Vector2.ClampMagnitude(direction * minPower, maxPower), ForceMode2D.Force);
+        shootSource.Play();
+        SetTurn(--turn);
+    }
+
+    private void SetScore(int score) => textScore.text = "Score: " + score.ToString();
+
+    private void SetTurn(int turn) => textTurn.text = "Turn: " + turn.ToString();
+
+    private void Waiting()
+    {
+        time += Time.deltaTime;
+        if (time >= 5F)
+        {
+            time = 0F;
+            isWaiting = false;
+            rb2d.isKinematic = false;
+            gameOverScreen.SetActive(false);
+            Destroy(GameObject.FindWithTag("Hole"));
+            score = 0;
+            SetScore(score);
+            turn = maxTurn;
+            SetTurn(turn);
+            mainCamera.GenerateStage();
+        }
+    }
+
+    private void GameOver()
+    {
+        textGameOver.text = "End Game\r\nYour Score: " + score.ToString();
+        gameOverScreen.SetActive(true);
+        rb2d.velocity = new Vector2(0F, 0F);
+        rb2d.isKinematic = true;
+        isWaiting = true;
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -92,7 +178,16 @@ public class ShootBallZ : MonoBehaviour
         if (collision.gameObject.tag == "Hole")
         {
             Instantiate(prefabsGoalFX, collision.gameObject.transform.position, Quaternion.identity);
-            Destroy(gameObject);
+            goalSource.Play();
+            SetScore(++score);
+            Destroy(collision.gameObject);
+            mainCamera.GenerateHole();
+            rb2d.velocity = new Vector2(0F, 0F);
+            gameObject.transform.position = start.transform.position;
+        }
+        else if (collision.gameObject.tag == "MainCamera")
+        {
+            GameOver();
         }
     }
 
