@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Ball
   - Hole
+  - Rain
   layers:
   - Default
   - TransparentFX

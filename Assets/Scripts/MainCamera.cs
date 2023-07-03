@@ -7,7 +7,15 @@ public class MainCamera : MonoBehaviour
     [SerializeField]
     private GameObject prefabsWind;
     [SerializeField]
+    private GameObject prefabsRain;
+    [SerializeField]
     private GameObject prefabsHole;
+    [SerializeField]
+    private GameObject prefabsGlobalVolume;
+    private GameObject globalVolume;
+    private float globalVolumeTime = 20F;
+    private int isNight = 0;
+    private float time = 0.0F;
     private float elapseTime = 0.0F;
     private float spawnTime = 2.0F;
     private Vector2 holePosition;
@@ -28,12 +36,27 @@ public class MainCamera : MonoBehaviour
     {
         holePosition = holePositionArray[0];
         Instantiate(prefabsHole, holePosition, Quaternion.identity);
+        prefabsGlobalVolume = Instantiate(prefabsGlobalVolume, new Vector2(0F, 0F), Quaternion.identity);
+        prefabsGlobalVolume.SetActive(false);
     }
 
     // Update is called once per frame
     void Update()
     {
         GenerateWind();
+
+        GenerateGlobalVolume();
+    }
+
+    private void GenerateGlobalVolume()
+    {
+        time += Time.deltaTime;
+
+        if (time >= globalVolumeTime)
+        {
+            time = 0;
+            prefabsGlobalVolume.SetActive(++isNight % 2 == 0 ? false : true);
+        }
     }
 
     public void GenerateStage()
@@ -55,6 +78,11 @@ public class MainCamera : MonoBehaviour
             Instantiate(prefabsWind, position, Quaternion.identity);
             elapseTime = 0;
         }
+    }
+
+    public void GenerateRain()
+    {
+        Instantiate(prefabsRain, new Vector3(0F, 7.2F, 0), Quaternion.identity);
     }
 
     public void GenerateHole()

@@ -20,7 +20,7 @@ public class ShootBallZ : MonoBehaviour
     private Vector2 startPosition;
     private Vector2 endPosition;
     private float minPower = 50F;
-    private float maxPower = 500F;
+    private float maxPower = 800F;
     private Scene mainScene;
     private PhysicsScene2D mainPhysicsScene;
     private Scene predictionScene;
@@ -35,10 +35,14 @@ public class ShootBallZ : MonoBehaviour
     private TextMeshProUGUI textGameOver;
     [SerializeField]
     private TextMeshProUGUI textTurn;
-    private int maxTurn = 5;
+    private int maxTurn = 10;
     private int turn;
+    [SerializeField]
+    private TextMeshProUGUI textTime;
+    private float maxTime = 60F;
+    private float time;
     private bool isWaiting = false;
-    private float time = 0F;
+    private float waitTime = 0F;
 
     #endregion
 
@@ -72,6 +76,8 @@ public class ShootBallZ : MonoBehaviour
         textScore.text = "Score: " + score;
         turn = maxTurn;
         textTurn.text = "Turn: " + turn;
+        time = maxTime;
+        textTime.text = "Time: " + time;
     }
 
     // Update is called once per frame
@@ -79,9 +85,11 @@ public class ShootBallZ : MonoBehaviour
     {
         if (!isWaiting)
         {
+            CountDownTime();
+
             if (!ReadyShoot()) { return; }
 
-            if (ReadyShoot() && turn == 0) GameOver();
+            if ((ReadyShoot() && turn == 0) || time <= 0F) GameOver();
 
             if (Input.GetMouseButtonDown(0)) DragStart();
 
@@ -146,12 +154,21 @@ public class ShootBallZ : MonoBehaviour
 
     private void SetTurn(int turn) => textTurn.text = "Turn: " + turn.ToString();
 
+    private void SetTime(int time) => textTime.text = "Time: " + time.ToString();
+
+    private void CountDownTime()
+    {
+        time -= Time.deltaTime;
+        if (time <= Mathf.Floor(time) + 0.01) SetTime((int)time);
+    }
+
     private void Waiting()
     {
-        time += Time.deltaTime;
-        if (time >= 5F)
+        waitTime += Time.deltaTime;
+
+        if (waitTime >= 5F)
         {
-            time = 0F;
+            waitTime = 0F;
             isWaiting = false;
             rb2d.isKinematic = false;
             gameOverScreen.SetActive(false);
@@ -160,6 +177,8 @@ public class ShootBallZ : MonoBehaviour
             SetScore(score);
             turn = maxTurn;
             SetTurn(turn);
+            time = maxTime;
+            SetTime((int)maxTime);
             mainCamera.GenerateStage();
         }
     }
@@ -173,6 +192,12 @@ public class ShootBallZ : MonoBehaviour
         isWaiting = true;
     }
 
+    private void Rain()
+    {
+        Destroy(GameObject.FindWithTag("Rain"));
+        if (Random.Range(0, 5) < 1) mainCamera.GenerateRain();
+    }
+
     private void OnCollisionEnter2D(Collision2D collision)
     {
         if (collision.gameObject.tag == "Hole")
@@ -184,6 +209,8 @@ public class ShootBallZ : MonoBehaviour
             mainCamera.GenerateHole();
             rb2d.velocity = new Vector2(0F, 0F);
             gameObject.transform.position = start.transform.position;
+            maxPower -= 50F;
+            Rain();
         }
         else if (collision.gameObject.tag == "MainCamera")
         {
