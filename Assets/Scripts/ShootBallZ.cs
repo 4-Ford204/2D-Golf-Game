@@ -28,6 +28,7 @@ public class ShootBallZ : MonoBehaviour
     private AudioSource[] audioSources;
     private AudioSource goalSource;
     private AudioSource shootSource;
+    private AudioSource endGameSource;
     [SerializeField]
     private TextMeshProUGUI textScore;
     private int score = 0;
@@ -71,6 +72,10 @@ public class ShootBallZ : MonoBehaviour
             else if (audioSource.clip.name == "Shoot")
             {
                 shootSource = audioSource;
+            }
+            else if (audioSource.clip.name == "EndGame")
+            {
+                endGameSource = audioSource;
             }
         }
         textScore.text = "Score: " + score;
@@ -185,6 +190,7 @@ public class ShootBallZ : MonoBehaviour
 
     private void GameOver()
     {
+        endGameSource.Play();
         textGameOver.text = "End Game\r\nYour Score: " + score.ToString();
         gameOverScreen.SetActive(true);
         rb2d.velocity = new Vector2(0F, 0F);
@@ -215,6 +221,14 @@ public class ShootBallZ : MonoBehaviour
         else if (collision.gameObject.tag == "MainCamera")
         {
             GameOver();
+        }
+    }
+
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        if (collision.gameObject.tag == "Wind")
+        {
+            rb2d.velocity += collision.gameObject.GetComponent<Rigidbody2D>().velocity;
         }
     }
 
